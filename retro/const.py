@@ -189,8 +189,9 @@ NUM_DOMS_PER_STRING = 60
 NUM_DOMS_TOT = NUM_STRINGS * NUM_DOMS_PER_STRING
 
 
-DC_STRS = np.array([79, 80, 81, 82, 83, 84, 85, 86], dtype=np.uint8)
+DC_STRS = np.arange(79, 87, dtype=np.uint8)
 DC_IC_STRS = np.array([26, 27, 35, 36, 37, 45, 46], dtype=np.uint8)
+IC_STRS = np.arange(1, 79, dtype=np.uint8)
 
 DC_SUBDUST_DOMS = np.array(list(range(11, 60+1)), dtype=np.uint8)
 IC_SUBDUST_DOMS = np.array(list(range(25, 60+1)), dtype=np.uint8)
