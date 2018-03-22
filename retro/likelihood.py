@@ -27,6 +27,9 @@ limitations under the License.'''
 
 from os.path import abspath, dirname
 import sys
+
+import numpy as np
+
 from pisa.utils.profiler import line_profile, profile
 from pisa.utils import log
 log.set_verbosity(2)
@@ -100,7 +103,8 @@ def get_neg_llh(
 
     sum_at_all_times = 0.0
     tot_sum_log_at_hit_times = 0.0
-    for sd_idx in const.DC_ALL_SUBDUST_STRS_DOMS:
+    #for sd_idx in const.DC_ALL_SUBDUST_STRS_DOMS:
+    for sd_idx in const.ALL_STRS_DOMS:
         this_hits = hits[sd_idx]
         # DEBUG: remove the below if / continue when no longer debugging!
         #if this_hits is None:
