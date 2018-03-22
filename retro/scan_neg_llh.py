@@ -264,13 +264,17 @@ def scan_neg_llh():
     if '{subdet' in dom_tables_fname_proto:
         for subdet in ['ic', 'dc']:
             if subdet == 'ic':
+                doms = const.ALL_DOMS
+                strings = const.IC_STRS
                 subdust_doms = const.IC_SUBDUST_DOMS
-                strings = const.DC_IC_STRS
+                #strings = const.DC_IC_STRS
             else:
+                doms = const.ALL_DOMS
                 subdust_doms = const.DC_SUBDUST_DOMS
                 strings = const.DC_STRS
 
-            for dom in subdust_doms:
+            #for dom in subdust_doms:
+            for dom in doms:
                 fpath = dom_tables_fname_proto.format(
                     subdet=subdet, dom=dom, depth_idx=dom-1
                 )
