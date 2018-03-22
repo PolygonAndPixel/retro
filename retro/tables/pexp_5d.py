@@ -34,6 +34,7 @@ from os.path import abspath, dirname
 import sys
 
 import numpy as np
+import numba
 
 if __name__ == '__main__' and __package__ is None:
     RETRO_DIR = dirname(dirname(dirname(abspath(__file__))))
@@ -291,7 +292,24 @@ def generate_pexp_5d_function(
             '''
             return table[r_bin_idx, costheta_bin_idx, t_bin_idx, costhetadir_bin_idx, deltaphidir_bin_idx]
 
+    from retro.retro_types import DOM_INFO
+    from retro.hypo.discrete_hypo import SRC_DTYPE
+    sources_dtype = SRC_DTYPE
+    dom_info_dtype = DOM_INFO
+    tabledt = np.dtype([('index', np.uint16), ('weight', np.float32)])
 
+
+    #@numba_jit((
+    #            numba.from_dtype(sources_dtype)[:],
+    #            numba.float32[:,:],
+    #            numba.from_dtype(dom_info_dtype),
+    #            numba.float64,
+    #            numba.from_dtype(tabledt)[:,:,:],
+    #            numba.float64[:,:],
+    #            numba.float32[:,:,:,:],
+    #            numba.float64[:]
+    #            ),
+    #            **DFLT_NUMBA_JIT_KWARGS)
     @numba_jit(**DFLT_NUMBA_JIT_KWARGS)
     def pexp_5d(
             sources,
@@ -303,6 +321,8 @@ def generate_pexp_5d_function(
             t_indep_table=empty_4d_array,
             t_indep_table_norm=empty_1d_array,
         ):
+
+        #return np.random.rand(), np.random.rand()
 
         num_hits = hits.shape[1]
 
@@ -428,7 +448,7 @@ def generate_pexp_5d_function(
                     if costhetadir_bin_idx > last_costhetadir_bin_idx:
                         costhetadir_bin_idx = last_costhetadir_bin_idx
 
-                    pdir_deltaphi = math.acos(pdir_cosdeltaphi)
+                    pdir_deltaphi = abs(math.acos(pdir_cosdeltaphi))
                     deltaphidir_bin_idx = int(pdir_deltaphi / table_dphidir)
 
                     # Make upper edge inclusive
