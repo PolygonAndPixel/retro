@@ -54,7 +54,7 @@ if __name__ == '__main__' and __package__ is None:
     if RETRO_DIR not in sys.path:
         sys.path.append(RETRO_DIR)
 from retro import HYPO_PARAMS_T, LLHP_T, init_obj
-from retro.const import TWO_PI, ALL_STRS_DOMS_SET
+from retro.const import TWO_PI, ALL_STRS_DOMS_SET, NUM_DOMS_TOT
 from retro.retro_types import HypoParams8D, HypoParams10D
 from retro.utils.misc import expand, mkdir, sort_dict
 #from retro.likelihood import get_llh
@@ -68,14 +68,18 @@ TRCK_ZEN = 'track_zenith'
 TRCK_AZ = 'track_azimuth'
 CSCD_ZEN = 'cascade_zenith'
 CSCD_AZ = 'cascade_azimuth'
+CSCD_ENERGY = 'cascade_energy'
+TRCK_ENERGY = 'track_energy'
 ENERGY = 'energy'
 TRCK_FRAC = 'track_fraction'
 
 
 if HYPO_PARAMS_T is HypoParams8D:
-    CUBE_DIMS = [X, Y, Z, T, TRCK_ZEN, TRCK_AZ, ENERGY, TRCK_FRAC]
+    #CUBE_DIMS = [X, Y, Z, T, TRCK_ZEN, TRCK_AZ, ENERGY, TRCK_FRAC]
+    CUBE_DIMS = [X, Y, Z, T, TRCK_ZEN, TRCK_AZ, CSCD_ENERGY, TRCK_ENERGY]
 elif HYPO_PARAMS_T is HypoParams10D:
-    CUBE_DIMS = [X, Y, Z, T, TRCK_ZEN, TRCK_AZ, ENERGY, TRCK_FRAC, CSCD_ZEN, CSCD_AZ]
+    #CUBE_DIMS = [X, Y, Z, T, TRCK_ZEN, TRCK_AZ, ENERGY, TRCK_FRAC, CSCD_ZEN, CSCD_AZ]
+    CUBE_DIMS = [X, Y, Z, T, TRCK_ZEN, TRCK_AZ, CSCD_ENERGY, TRCK_ENERGY, CSCD_ZEN, CSCD_AZ]
 else:
     raise NotImplementedError(str(HYPO_PARAMS_T))
 
@@ -86,8 +90,11 @@ CUBE_Y_IDX = CUBE_DIMS.index(Y)
 CUBE_Z_IDX = CUBE_DIMS.index(Z)
 CUBE_TRACK_ZEN_IDX = CUBE_DIMS.index(TRCK_ZEN)
 CUBE_TRACK_AZ_IDX = CUBE_DIMS.index(TRCK_AZ)
-CUBE_ENERGY_IDX = CUBE_DIMS.index(ENERGY)
-CUBE_TRACK_FRAC_IDX = CUBE_DIMS.index(TRCK_FRAC)
+#CUBE_ENERGY_IDX = CUBE_DIMS.index(ENERGY)
+#CUBE_TRACK_FRAC_IDX = CUBE_DIMS.index(TRCK_FRAC)
+CUBE_CSCD_ENERGY_IDX = CUBE_DIMS.index(CSCD_ENERGY)
+CUBE_TRCK_ENERGY_IDX = CUBE_DIMS.index(TRCK_ENERGY)
+
 if HYPO_PARAMS_T is HypoParams8D:
     CUBE_CSCD_ZEN_IDX = None
     CUBE_CSCD_AZ_IDX = None
@@ -245,7 +252,7 @@ def run_multinest(
     log_likelihoods = []
     t_start = []
 
-    report_after = 1000
+    report_after = 1
 
     def prior(cube, ndim, nparams): # pylint: disable=unused-argument
         """Function for pymultinest to translate the hypercube MultiNest uses
@@ -274,6 +281,7 @@ def run_multinest(
     time_window = np.float32(
         hits_summary['time_window_stop'] - hits_summary['time_window_start']
     )
+    print('time window = %s'%time_window)
     # TODO: implement logic allowing for not all DOMs to be used
     #hit_sd_indices = np.array(
     #    sorted(dom_tables.use_sd_indices_set.union(hits_indexer['sd_idx'])),
@@ -284,6 +292,8 @@ def run_multinest(
         sorted(ALL_STRS_DOMS_SET.difference(hit_sd_indices)),
         dtype=np.uint32
     )
+
+    assert(len(hit_sd_indices) + len(unhit_sd_indices) == NUM_DOMS_TOT)
 
     # DEBUG
     #table_indices = []
@@ -303,8 +313,8 @@ def run_multinest(
 
             t0 = time.time()
 
-            total_energy = cube[CUBE_ENERGY_IDX]
-            track_fraction = cube[CUBE_TRACK_FRAC_IDX]
+            #total_energy = cube[CUBE_ENERGY_IDX]
+            #track_fraction = cube[CUBE_TRACK_FRAC_IDX]
 
             if HYPO_PARAMS_T is HypoParams8D:
                 hypo = HYPO_PARAMS_T(
@@ -314,8 +324,10 @@ def run_multinest(
                     z=cube[CUBE_Z_IDX],
                     track_zenith=cube[CUBE_TRACK_ZEN_IDX],
                     track_azimuth=cube[CUBE_TRACK_AZ_IDX],
-                    cascade_energy=total_energy * (1 - track_fraction),
-                    track_energy=total_energy * track_fraction
+                    #cascade_energy=total_energy * (1 - track_fraction),
+                    #track_energy=total_energy * track_fraction
+                    cascade_energy=cube[CUBE_CSCD_ENERGY_IDX],
+                    track_energy=cube[CUBE_TRCK_ENERGY_IDX],
                 )
             else:
                 hypo = HYPO_PARAMS_T(
@@ -325,8 +337,10 @@ def run_multinest(
                     z=cube[CUBE_Z_IDX],
                     track_zenith=cube[CUBE_TRACK_ZEN_IDX],
                     track_azimuth=cube[CUBE_TRACK_AZ_IDX],
-                    cascade_energy=total_energy * (1 - track_fraction),
-                    track_energy=total_energy * track_fraction,
+                    #cascade_energy=total_energy * (1 - track_fraction),
+                    #track_energy=total_energy * track_fraction,
+                    cascade_energy=cube[CUBE_CSCD_ENERGY_IDX],
+                    track_energy=cube[CUBE_TRCK_ENERGY_IDX],
                     cascade_zenith=cube[CUBE_CSCD_ZEN_IDX],
                     cascade_azimuth=cube[CUBE_CSCD_AZ_IDX]
                 )
@@ -367,8 +381,22 @@ def run_multinest(
                 best_idx = np.argmax(log_likelihoods)
                 best_llh = log_likelihoods[best_idx]
                 best_p = param_values[best_idx]
+                this_llh = log_likelihoods[-1]
+                this_p = param_values[-1]
                 print('')
                 if HYPO_PARAMS_T is HypoParams8D:
+                    print('tot sources = %s, tot photons = %s'%(len(sources), np.sum(sources['photons'])))
+                    print('total noise hits = %s'%(np.sum(np.nan_to_num(dom_info['noise_rate_per_ns']))*time_window))
+                    truth = event['truth']
+                    print(('            truth = '
+                           '(t={:+.1f}, x={:+.1f}, y={:+.1f}, z={:+.1f},'
+                           ' zen={:.1f} deg, az={:.1f} deg, Etrk={:.1f}, Ecscd={:.1f})')
+                          .format(
+                              truth['time'], truth['x'], truth['y'], truth['z'],
+                              np.rad2deg(np.arccos(truth['coszen'])),
+                              np.rad2deg(truth['azimuth']),
+                              truth['highest_energy_daughter_energy'],
+                              truth['cascade_energy']))
                     print(('best llh = {:.3f} @ '
                            '(t={:+.1f}, x={:+.1f}, y={:+.1f}, z={:+.1f},'
                            ' zen={:.1f} deg, az={:.1f} deg, Etrk={:.1f}, Ecscd={:.1f})')
@@ -378,6 +406,15 @@ def run_multinest(
                               np.rad2deg(best_p.track_azimuth),
                               best_p.track_energy,
                               best_p.cascade_energy))
+                    print(('this llh = {:.3f} @ '
+                           '(t={:+.1f}, x={:+.1f}, y={:+.1f}, z={:+.1f},'
+                           ' zen={:.1f} deg, az={:.1f} deg, Etrk={:.1f}, Ecscd={:.1f})')
+                          .format(
+                              this_llh, this_p.time, this_p.x, this_p.y, this_p.z,
+                              np.rad2deg(this_p.track_zenith),
+                              np.rad2deg(this_p.track_azimuth),
+                              this_p.track_energy,
+                              this_p.cascade_energy))
                 else:
                     print(('best llh = {:.3f} @'
                            ' (t={:+.1f}, x={:+.1f}, y={:+.1f}, z={:+.1f},'
@@ -558,24 +595,43 @@ def reco(dom_tables_kw, hypo_kw, events_kw, reco_kw):
         raise ValueError('Temporal prior "{}" not recognized'
                          .format(temporal_prior_orig))
 
-    energy_prior_name = reco_kw.pop('energy_prior')
-    energy_lims = reco_kw.pop('energy_lims')
-    if energy_prior_name == PRI_UNIFORM:
-        energy_prior = (PRI_UNIFORM, (np.min(energy_lims), np.max(energy_lims)))
-    elif energy_prior_name == PRI_LOG_UNIFORM:
-        energy_prior = (PRI_LOG_UNIFORM, (np.min(energy_lims), np.max(energy_lims)))
-    elif energy_prior_name == PRI_LOG_NORMAL:
-        energy_prior = (
+    cscd_energy_prior_name = reco_kw.pop('cscd_energy_prior')
+    cscd_energy_lims = reco_kw.pop('cscd_energy_lims')
+    if cscd_energy_prior_name == PRI_UNIFORM:
+        cscd_energy_prior = (PRI_UNIFORM, (np.min(cscd_energy_lims), np.max(cscd_energy_lims)))
+    elif cscd_energy_prior_name == PRI_LOG_UNIFORM:
+        cscd_energy_prior = (PRI_LOG_UNIFORM, (np.min(cscd_energy_lims), np.max(cscd_energy_lims)))
+    elif cscd_energy_prior_name == PRI_LOG_NORMAL:
+        cscd_energy_prior = (
             PRI_LOG_NORMAL,
             (
                 # scipy.stats.lognorm 3 paramters
                 0.96251341305506233, 0.4175592980195757, 17.543915051586644,
                 # hard limits
-                np.min(energy_lims), np.max(energy_lims)
+                np.min(cscd_energy_lims), np.max(cscd_energy_lims)
             )
         )
     else:
-        raise ValueError(str(energy_prior_name))
+        raise ValueError(str(cscd_energy_prior_name))
+
+    trck_energy_prior_name = reco_kw.pop('trck_energy_prior')
+    trck_energy_lims = reco_kw.pop('trck_energy_lims')
+    if trck_energy_prior_name == PRI_UNIFORM:
+        trck_energy_prior = (PRI_UNIFORM, (np.min(trck_energy_lims), np.max(trck_energy_lims)))
+    elif trck_energy_prior_name == PRI_LOG_UNIFORM:
+        trck_energy_prior = (PRI_LOG_UNIFORM, (np.min(trck_energy_lims), np.max(trck_energy_lims)))
+    elif trck_energy_prior_name == PRI_LOG_NORMAL:
+        trck_energy_prior = (
+            PRI_LOG_NORMAL,
+            (
+                # scipy.stats.lognorm 3 paramters
+                0.96251341305506233, 0.4175592980195757, 17.543915051586644,
+                # hard limits
+                np.min(trck_energy_lims), np.max(trck_energy_lims)
+            )
+        )
+    else:
+        raise ValueError(str(trck_energy_prior_name))
 
     priors = OrderedDict([
         ('time', time_prior),
@@ -584,7 +640,8 @@ def reco(dom_tables_kw, hypo_kw, events_kw, reco_kw):
         ('z', z_prior),
         ('track_zenith', (PRI_COSINE, (-1, 1))),
         ('track_azimuth', (PRI_UNIFORM, (0, TWO_PI))),
-        ('energy', energy_prior),
+        ('cascade_energy', cscd_energy_prior),
+        ('track_energy', trck_energy_prior),
         ('track_fraction', (PRI_UNIFORM, (0, 1)))
     ])
     if HYPO_PARAMS_T is HypoParams10D:
@@ -651,17 +708,31 @@ def parse_args(description=__doc__):
         bias) the SPEFit2 time best-fit value.'''
     )
     group.add_argument(
-        '--energy-prior',
+        '--cscd-energy-prior',
         choices=[PRI_UNIFORM, PRI_LOG_UNIFORM, PRI_LOG_NORMAL],
         required=True,
-        help='''Prior to put on _total_ event energy. Must specify
-        --energy-lims.'''
+        help='''Prior to put on cascade event energy. Must specify
+        --cscd-energy-lims.'''
     )
     group.add_argument(
-        '--energy-lims', nargs='+',
+        '--trck-energy-prior',
+        choices=[PRI_UNIFORM, PRI_LOG_UNIFORM, PRI_LOG_NORMAL],
         required=True,
-        help='''Lower and upper energy limits, in GeV. E.g.: --energy-lims=1,100
-        Required if --energy-prior is {}, {}, or {}'''
+        help='''Prior to put on track event energy. Must specify
+        --trck-energy-lims.'''
+    )
+    group.add_argument(
+        '--cscd-energy-lims', nargs='+',
+        required=True,
+        help='''Lower and upper energy limits, in GeV. E.g.: --cscd-energy-lims=1,100
+        Required if --cscd-energy-prior is {}, {}, or {}'''
+        .format(PRI_UNIFORM, PRI_LOG_UNIFORM, PRI_LOG_NORMAL)
+    )
+    group.add_argument(
+        '--trck-energy-lims', nargs='+',
+        required=True,
+        help='''Lower and upper energy limits, in GeV. E.g.: --trck-energy-lims=1,100
+        Required if --trck-energy-prior is {}, {}, or {}'''
         .format(PRI_UNIFORM, PRI_LOG_UNIFORM, PRI_LOG_NORMAL)
     )
 
@@ -711,14 +782,22 @@ def parse_args(description=__doc__):
 
     split_kwargs['reco_kw'] = reco_kw = split_kwargs.pop('other_kw')
 
-    if reco_kw['energy_prior'] in [PRI_UNIFORM, PRI_LOG_UNIFORM, PRI_LOG_NORMAL]:
-        assert reco_kw['energy_lims'] is not None
-        elims = ''.join(reco_kw['energy_lims'])
-        elims = [float(l) for l in elims.split(',')]
-        reco_kw['energy_lims'] = elims
-    elif reco_kw['energy_lims'] is not None:
-        raise ValueError('--energy-limits not used with energy prior {}'
-                         .format(reco_kw['energy_prior']))
+    if reco_kw['cscd_energy_prior'] in [PRI_UNIFORM, PRI_LOG_UNIFORM, PRI_LOG_NORMAL]:
+        assert reco_kw['cscd_energy_lims'] is not None
+        cscd_elims = ''.join(reco_kw['cscd_energy_lims'])
+        cscd_elims = [float(l) for l in cscd_elims.split(',')]
+        reco_kw['cscd_energy_lims'] = cscd_elims
+    elif reco_kw['cscd_energy_lims'] is not None:
+        raise ValueError('--cscd-energy-limits not used with energy prior {}'
+                         .format(reco_kw['cscd_energy_prior']))
+    if reco_kw['trck_energy_prior'] in [PRI_UNIFORM, PRI_LOG_UNIFORM, PRI_LOG_NORMAL]:
+        assert reco_kw['trck_energy_lims'] is not None
+        trck_elims = ''.join(reco_kw['trck_energy_lims'])
+        trck_elims = [float(l) for l in trck_elims.split(',')]
+        reco_kw['trck_energy_lims'] = trck_elims
+    elif reco_kw['trck_energy_lims'] is not None:
+        raise ValueError('--trck-energy-limits not used with energy prior {}'
+                         .format(reco_kw['trck_energy_prior']))
 
     return split_kwargs
 

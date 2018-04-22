@@ -627,9 +627,11 @@ def get_table_norm(
     elif norm_version == 'binvol2':
         radial_norm = 1 / bin_vols
         table_norm = (
-            constant_part * counts_per_t * radial_norm[:, np.newaxis]
+            constant_part * counts_per_t * radial_norm[:, np.newaxis] * t_bin_widths
         )
-        t_indep_table_norm = constant_part * radial_norm / np.sum(1/counts_per_t) * t_bin_range
+        t_indep_table_norm = constant_part * radial_norm * counts_per_t[0] * t_bin_widths[0] #/ np.sum(1/counts_per_t) * t_bin_range
+        #t_indep_table_norm = constant_part * radial_norm * np.sum(counts_per_t)
+        #t_indep_table_norm = table_norm[:,0] * t_bin_range
 
     elif norm_version == 'binvol3':
         radial_norm = 1 / bin_vols / avg_radius

@@ -30,8 +30,8 @@ no_noise=""
 importance_sampling="--importance-sampling"
 #importance_sampling=""
 
-#consteff="--const-eff"
-consteff=""
+consteff="--const-eff"
+#consteff=""
 
 #cascade_kernel="point_ckv"
 #cascade_samples=""
@@ -45,15 +45,17 @@ python ~/retro/retro/reco.py \
     --outdir "$outdir" \
     --spatial-prior SPEFit2 \
     --temporal-prior SPEFit2 \
-    --energy-prior log_uniform \
-    --energy-lims 0.2,2000  \
+    --cscd-energy-prior log_uniform \
+    --cscd-energy-lims 0.1,1000  \
+    --trck-energy-prior uniform \
+    --trck-energy-lims 0.1,500  \
     \
     $importance_sampling \
     --max-modes 1 \
     $consteff \
     --n-live 1000 \
     --evidence-tol 0.1 \
-    --sampling-eff 0.3 \
+    --sampling-eff 0.5 \
     --max-iter 10000 \
     --seed 0 \
     \
@@ -66,8 +68,8 @@ python ~/retro/retro/reco.py \
     --step-length 1.0 \
     $no_noise \
     \
-    --cascade-kernel "one_dim" \
-    --track-kernel "table_e_loss" \
+    --cascade-kernel $cascade_kernel \
+    --track-kernel "const_e_loss" \
     --track-time-step 1.0 \
     \
     --events-base "$events_base" \

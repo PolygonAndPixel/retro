@@ -973,24 +973,38 @@ def generate_pexp_5d_function(
                 )
 
         sum_log_exp_at_hit_times = np.float64(0)
+        sum_exp = np.float64(0)
         for hit_idx in range(num_hits):
             exp_at_hit_time = exp_at_hit_times[hit_idx]
             hit_mult = hits[hit_idx]['charge']
-            log_expr = quantum_efficiency * exp_at_hit_time + noise_rate_per_ns
-            log_expr = max(MACHINE_EPS, log_expr)
+            log_expr = 12./time_window
+            # indepnendent noise (probably unnecessary to have noise here at all)
+            if exp_at_hit_time > 0:
+                log_expr += exp_at_hit_time/t_indep_exp # * (1 - 1./time_window)) + 1./time_window
+            #else:
+            #    #log_expr = 1./time_window
+            #    log_expr = MACHINE_EPS
+            #log_expr = max(MACHINE_EPS, log_expr)
+            sum_exp += log_expr
             sum_log_exp_at_hit_times += (
                 hit_mult * math.log(log_expr)
             )
 
         t_indep_exp = (
-            quantum_efficiency * t_indep_exp + noise_rate_per_ns * time_window
+            (quantum_efficiency * t_indep_exp) + (noise_rate_per_ns * time_window)
         )
+
+        # second poisson term
+        if num_hits > 0:
+            tot_charge = np.sum(hits['charge'])
+            sum_log_exp_at_hit_times += tot_charge * math.log(t_indep_exp)
 
         return t_indep_exp, sum_log_exp_at_hit_times
 
     if tbl_is_ckv and compute_t_indep_exp:
         pexp_5d = pexp_5d_ckv_compute_t_indep
     else:
+        print('NO T-INDEP!!!')
         pexp_5d = pexp_5d_generic
 
     # DEBUG
@@ -1037,8 +1051,11 @@ def generate_pexp_5d_function(
 
         """
         llh = np.float64(0)
+        tot_tindep = np.float64(0)
+        log_hits = np.float64(0)
 
         # Loop through all DOMs we know didn't receive hits
+        #print(unhit_sd_indices)
         for sd_idx1 in unhit_sd_indices:
             table_idx = sd_idx_table_indexer[sd_idx1]
             t_indep_exp, sum_log_exp_at_hit_times = pexp_5d(
@@ -1052,11 +1069,15 @@ def generate_pexp_5d_function(
                 t_indep_table_norm=t_indep_table_norm,
             )
             llh += sum_log_exp_at_hit_times - t_indep_exp
+            tot_tindep += t_indep_exp
+            #print(sum_log_exp_at_hit_times, t_indep_exp)
+            #print(llh)
 
         # Loop through all DOMs that are in the sd_idx range where hits
         # occurred, checking each for whether or not it was hit. We assume that
         # the DOMs in the hits_indexer are sorted in ascending sd_idx order to
         # decrease the amount of looping necessary.
+        #print(hits_indexer)
         for indexer_entry in hits_indexer:
             sd_idx2 = indexer_entry['sd_idx']
             start = indexer_entry['offset']
@@ -1073,6 +1094,13 @@ def generate_pexp_5d_function(
                 t_indep_table_norm=t_indep_table_norm,
             )
             llh += sum_log_exp_at_hit_times - t_indep_exp
+            tot_tindep += t_indep_exp
+            log_hits += sum_log_exp_at_hit_times
+            #print(llh)
+        print('tot t-indep. exp = ', tot_tindep)
+        print('tot hits =', np.sum(hits['charge']))
+        print('log hits = ', log_hits)
+        print('llh = ',llh)
         return llh
 
     @numba_jit(**DFLT_NUMBA_JIT_KWARGS)
@@ -1130,6 +1158,7 @@ def generate_pexp_5d_function(
     if compute_t_indep_exp:
         get_llh = get_llh_all_doms
     else:
+        print('ONLY HIT DOMS IN LLH!!!')
         get_llh = get_llh_hit_doms
 
     return pexp_5d, get_llh, meta
